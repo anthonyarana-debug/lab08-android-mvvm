@@ -43,8 +43,18 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { }
 
+    private lateinit var viewModel: TaskViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val db = Room.databaseBuilder(
+            applicationContext,
+            TaskDatabase::class.java,
+            "task_db"
+        ).fallbackToDestructiveMigration().build()
+
+        viewModel = TaskViewModel(db.taskDao())
 
         NotificationHelper.createNotificationChannel(this)
 
@@ -59,14 +69,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Lab08Theme {
-                val db = Room.databaseBuilder(
-                    applicationContext,
-                    TaskDatabase::class.java,
-                    "task_db"
-                ).fallbackToDestructiveMigration().build()
-
-                val taskDao = db.taskDao()
-                val viewModel = TaskViewModel(taskDao)
                 TaskScreen(viewModel)
             }
         }
@@ -81,7 +83,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortAscending by viewModel.sortAscending.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
-    val filteredTasks = viewModel.getFilteredTasks()
+    val filteredTasks = remember(tasks, filter, searchQuery, sortAscending, selectedCategory) {
+        viewModel.getFilteredTasks()
+    }
 
     var newTaskDescription by remember { mutableStateOf("") }
     var selectedPriority by remember { mutableStateOf(3) }
@@ -141,7 +145,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Filtros estado
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -167,7 +170,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 }
             }
 
-            // Filtros categoría
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -285,7 +287,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
         }
     }
 
-    // Dialog agregar
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -363,7 +364,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
         )
     }
 
-    // Dialog editar
     taskToEdit?.let { task ->
         AlertDialog(
             onDismissRequest = { taskToEdit = null },
@@ -427,8 +427,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDB4035))
                 ) {
-                    Text("Guardar")
-                }
+                    Text("Guardar") }
             },
             dismissButton = {
                 TextButton(onClick = { taskToEdit = null }) { Text("Cancelar") }
