@@ -1,9 +1,13 @@
 package com.example.lab08
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,16 +25,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.room.Room
 import com.example.lab08.ui.theme.Lab08Theme
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        NotificationHelper.createNotificationChannel(this)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         enableEdgeToEdge()
         setContent {
             Lab08Theme {
@@ -50,6 +72,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun TaskScreen(viewModel: TaskViewModel) {
+    val context = LocalContext.current
     val tasks by viewModel.tasks.collectAsState()
     val filter by viewModel.filter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -153,7 +176,14 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = { viewModel.toggleTaskCompletion(task) }) {
+                            IconButton(onClick = {
+                                viewModel.toggleTaskCompletion(task)
+                                if (!task.isCompleted) {
+                                    NotificationHelper.showTaskCompletedNotification(
+                                        context, task.description
+                                    )
+                                }
+                            }) {
                                 Box(
                                     modifier = Modifier
                                         .size(22.dp)
@@ -171,7 +201,14 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                     ) {
                                         RadioButton(
                                             selected = task.isCompleted,
-                                            onClick = { viewModel.toggleTaskCompletion(task) },
+                                            onClick = {
+                                                viewModel.toggleTaskCompletion(task)
+                                                if (!task.isCompleted) {
+                                                    NotificationHelper.showTaskCompletedNotification(
+                                                        context, task.description
+                                                    )
+                                                }
+                                            },
                                             colors = RadioButtonDefaults.colors(
                                                 selectedColor = priorityColor[task.priority]!!,
                                                 unselectedColor = priorityColor[task.priority]!!
@@ -254,6 +291,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     onClick = {
                         if (newTaskDescription.isNotEmpty()) {
                             viewModel.addTask(newTaskDescription, selectedPriority)
+                            NotificationHelper.showTaskAddedNotification(context, newTaskDescription)
                             newTaskDescription = ""
                             selectedPriority = 3
                             showDialog = false
