@@ -20,14 +20,24 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
     private val _sortAscending = MutableStateFlow(true)
     val sortAscending: StateFlow<Boolean> = _sortAscending
 
+    private val _selectedCategory = MutableStateFlow("Todas")
+    val selectedCategory: StateFlow<String> = _selectedCategory
+
+    val categories = listOf("Todas", "General", "Trabajo", "Estudio", "Personal", "Salud")
+
     init {
         viewModelScope.launch {
             _tasks.value = dao.getAllTasks()
         }
     }
 
-    fun addTask(description: String, priority: Int = 3) {
-        val newTask = Task(description = description, priority = priority)
+    fun addTask(description: String, priority: Int = 3, category: String = "General", isRecurring: Boolean = false) {
+        val newTask = Task(
+            description = description,
+            priority = priority,
+            category = category,
+            isRecurring = isRecurring
+        )
         viewModelScope.launch {
             dao.insertTask(newTask)
             _tasks.value = dao.getAllTasks()
@@ -38,6 +48,10 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         viewModelScope.launch {
             val updatedTask = task.copy(isCompleted = !task.isCompleted)
             dao.updateTask(updatedTask)
+            // Si es recurrente y se completa, insertar una copia sin completar
+            if (!task.isCompleted && task.isRecurring) {
+                dao.insertTask(task.copy(id = 0, isCompleted = false))
+            }
             _tasks.value = dao.getAllTasks()
         }
     }
@@ -49,9 +63,14 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         }
     }
 
-    fun editTask(task: Task, newDescription: String, newPriority: Int) {
+    fun editTask(task: Task, newDescription: String, newPriority: Int, newCategory: String, newRecurring: Boolean) {
         viewModelScope.launch {
-            val updatedTask = task.copy(description = newDescription, priority = newPriority)
+            val updatedTask = task.copy(
+                description = newDescription,
+                priority = newPriority,
+                category = newCategory,
+                isRecurring = newRecurring
+            )
             dao.updateTask(updatedTask)
             _tasks.value = dao.getAllTasks()
         }
@@ -76,12 +95,21 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         _sortAscending.value = !_sortAscending.value
     }
 
+    fun setCategory(category: String) {
+        _selectedCategory.value = category
+    }
+
     fun getFilteredTasks(): List<Task> {
-        val filtered = when (_filter.value) {
+        var filtered = when (_filter.value) {
             "Pendientes" -> _tasks.value.filter { !it.isCompleted }
             "Completadas" -> _tasks.value.filter { it.isCompleted }
             else -> _tasks.value
         }
+
+        if (_selectedCategory.value != "Todas") {
+            filtered = filtered.filter { it.category == _selectedCategory.value }
+        }
+
         val searched = if (_searchQuery.value.isEmpty()) filtered
         else filtered.filter { it.description.contains(_searchQuery.value, ignoreCase = true) }
 

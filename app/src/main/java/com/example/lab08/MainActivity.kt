@@ -9,9 +9,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,14 +80,19 @@ fun TaskScreen(viewModel: TaskViewModel) {
     val filter by viewModel.filter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortAscending by viewModel.sortAscending.collectAsState()
+    val selectedCategory by viewModel.selectedCategory.collectAsState()
     val filteredTasks = viewModel.getFilteredTasks()
 
     var newTaskDescription by remember { mutableStateOf("") }
     var selectedPriority by remember { mutableStateOf(3) }
+    var selectedNewCategory by remember { mutableStateOf("General") }
+    var isRecurring by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
     var editDescription by remember { mutableStateOf("") }
     var editPriority by remember { mutableStateOf(3) }
+    var editCategory by remember { mutableStateOf("General") }
+    var editRecurring by remember { mutableStateOf(false) }
 
     val priorityColor = mapOf(
         1 to Color(0xFFD32F2F),
@@ -133,6 +141,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Filtros estado
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -148,14 +157,30 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         )
                     )
                 }
-
                 Spacer(modifier = Modifier.weight(1f))
-
                 IconButton(onClick = { viewModel.toggleSort() }) {
                     Icon(
                         imageVector = if (sortAscending) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Ordenar por prioridad",
+                        contentDescription = "Ordenar",
                         tint = Color(0xFFDB4035)
+                    )
+                }
+            }
+
+            // Filtros categoría
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                viewModel.categories.forEach { cat ->
+                    FilterChip(
+                        selected = selectedCategory == cat,
+                        onClick = { viewModel.setCategory(cat) },
+                        label = { Text(cat, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF424242),
+                            selectedLabelColor = Color.White
+                        )
                     )
                 }
             }
@@ -179,9 +204,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             IconButton(onClick = {
                                 viewModel.toggleTaskCompletion(task)
                                 if (!task.isCompleted) {
-                                    NotificationHelper.showTaskCompletedNotification(
-                                        context, task.description
-                                    )
+                                    NotificationHelper.showTaskCompletedNotification(context, task.description)
                                 }
                             }) {
                                 Box(
@@ -194,62 +217,66 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(22.dp)
-                                            .background(Color.Transparent, CircleShape)
-                                    ) {
-                                        RadioButton(
-                                            selected = task.isCompleted,
-                                            onClick = {
-                                                viewModel.toggleTaskCompletion(task)
-                                                if (!task.isCompleted) {
-                                                    NotificationHelper.showTaskCompletedNotification(
-                                                        context, task.description
-                                                    )
-                                                }
-                                            },
-                                            colors = RadioButtonDefaults.colors(
-                                                selectedColor = priorityColor[task.priority]!!,
-                                                unselectedColor = priorityColor[task.priority]!!
-                                            )
+                                    RadioButton(
+                                        selected = task.isCompleted,
+                                        onClick = {
+                                            viewModel.toggleTaskCompletion(task)
+                                            if (!task.isCompleted) {
+                                                NotificationHelper.showTaskCompletedNotification(context, task.description)
+                                            }
+                                        },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = priorityColor[task.priority]!!,
+                                            unselectedColor = priorityColor[task.priority]!!
                                         )
-                                    }
+                                    )
                                 }
                             }
 
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = task.description,
-                                    fontSize = 15.sp,
-                                    color = if (task.isCompleted) Color.Gray else Color(0xFF212121),
-                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
-                                )
-                                Text(
-                                    text = "Prioridad: ${priorityLabel[task.priority]}",
-                                    fontSize = 11.sp,
-                                    color = priorityColor[task.priority]!!
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = task.description,
+                                        fontSize = 15.sp,
+                                        color = if (task.isCompleted) Color.Gray else Color(0xFF212121),
+                                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                                    )
+                                    if (task.isRecurring) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = "Recurrente",
+                                            tint = Color(0xFF757575),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = priorityLabel[task.priority]!!,
+                                        fontSize = 11.sp,
+                                        color = priorityColor[task.priority]!!
+                                    )
+                                    Text(
+                                        text = "· ${task.category}",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF757575)
+                                    )
+                                }
                             }
 
                             IconButton(onClick = {
                                 taskToEdit = task
                                 editDescription = task.description
                                 editPriority = task.priority
+                                editCategory = task.category
+                                editRecurring = task.isRecurring
                             }) {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = "Editar",
-                                    tint = Color.LightGray
-                                )
+                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = Color.LightGray)
                             }
 
                             IconButton(onClick = { viewModel.deleteTask(task) }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Eliminar",
-                                    tint = Color.LightGray
-                                )
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray)
                             }
                         }
                     }
@@ -258,6 +285,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
         }
     }
 
+    // Dialog agregar
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -284,16 +312,43 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             )
                         }
                     }
+                    Text("Categoría:", fontWeight = FontWeight.Medium)
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("General", "Trabajo", "Estudio", "Personal", "Salud").forEach { cat ->
+                            FilterChip(
+                                selected = selectedNewCategory == cat,
+                                onClick = { selectedNewCategory = cat },
+                                label = { Text(cat, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF424242),
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = isRecurring,
+                            onCheckedChange = { isRecurring = it },
+                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFDB4035))
+                        )
+                        Text("Tarea recurrente")
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (newTaskDescription.isNotEmpty()) {
-                            viewModel.addTask(newTaskDescription, selectedPriority)
+                            viewModel.addTask(newTaskDescription, selectedPriority, selectedNewCategory, isRecurring)
                             NotificationHelper.showTaskAddedNotification(context, newTaskDescription)
                             newTaskDescription = ""
                             selectedPriority = 3
+                            selectedNewCategory = "General"
+                            isRecurring = false
                             showDialog = false
                         }
                     },
@@ -303,13 +358,12 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Cancelar")
-                }
+                TextButton(onClick = { showDialog = false }) { Text("Cancelar") }
             }
         )
     }
 
+    // Dialog editar
     taskToEdit?.let { task ->
         AlertDialog(
             onDismissRequest = { taskToEdit = null },
@@ -336,13 +390,38 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             )
                         }
                     }
+                    Text("Categoría:", fontWeight = FontWeight.Medium)
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("General", "Trabajo", "Estudio", "Personal", "Salud").forEach { cat ->
+                            FilterChip(
+                                selected = editCategory == cat,
+                                onClick = { editCategory = cat },
+                                label = { Text(cat, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF424242),
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = editRecurring,
+                            onCheckedChange = { editRecurring = it },
+                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFDB4035))
+                        )
+                        Text("Tarea recurrente")
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (editDescription.isNotEmpty()) {
-                            viewModel.editTask(task, editDescription, editPriority)
+                            viewModel.editTask(task, editDescription, editPriority, editCategory, editRecurring)
                             taskToEdit = null
                         }
                     },
@@ -352,9 +431,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { taskToEdit = null }) {
-                    Text("Cancelar")
-                }
+                TextButton(onClick = { taskToEdit = null }) { Text("Cancelar") }
             }
         )
     }
