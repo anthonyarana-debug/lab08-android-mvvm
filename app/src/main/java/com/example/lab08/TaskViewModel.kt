@@ -28,6 +28,7 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
     init {
         viewModelScope.launch {
             _tasks.value = dao.getAllTasks()
+            FirestoreSync.syncAllTasks(_tasks.value)
         }
     }
 
@@ -41,6 +42,8 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         viewModelScope.launch {
             dao.insertTask(newTask)
             _tasks.value = dao.getAllTasks()
+            val inserted = _tasks.value.last()
+            FirestoreSync.uploadTask(inserted)
         }
     }
 
@@ -48,11 +51,11 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         viewModelScope.launch {
             val updatedTask = task.copy(isCompleted = !task.isCompleted)
             dao.updateTask(updatedTask)
-            // Si es recurrente y se completa, insertar una copia sin completar
             if (!task.isCompleted && task.isRecurring) {
                 dao.insertTask(task.copy(id = 0, isCompleted = false))
             }
             _tasks.value = dao.getAllTasks()
+            FirestoreSync.uploadTask(updatedTask)
         }
     }
 
@@ -60,6 +63,7 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         viewModelScope.launch {
             dao.deleteTask(task)
             _tasks.value = dao.getAllTasks()
+            FirestoreSync.deleteTask(task)
         }
     }
 
@@ -73,13 +77,16 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
             )
             dao.updateTask(updatedTask)
             _tasks.value = dao.getAllTasks()
+            FirestoreSync.uploadTask(updatedTask)
         }
     }
 
     fun deleteAllTasks() {
         viewModelScope.launch {
+            val current = _tasks.value
             dao.deleteAllTasks()
             _tasks.value = emptyList()
+            current.forEach { FirestoreSync.deleteTask(it) }
         }
     }
 
