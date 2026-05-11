@@ -46,6 +46,14 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         }
     }
 
+    fun editTask(task: Task, newDescription: String, newPriority: Int) {
+        viewModelScope.launch {
+            val updatedTask = task.copy(description = newDescription, priority = newPriority)
+            dao.updateTask(updatedTask)
+            _tasks.value = dao.getAllTasks()
+        }
+    }
+
     fun deleteAllTasks() {
         viewModelScope.launch {
             dao.deleteAllTasks()

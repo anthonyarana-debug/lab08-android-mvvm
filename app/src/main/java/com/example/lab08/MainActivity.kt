@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,6 +56,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var newTaskDescription by remember { mutableStateOf("") }
     var selectedPriority by remember { mutableStateOf(3) }
     var showDialog by remember { mutableStateOf(false) }
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
+    var editDescription by remember { mutableStateOf("") }
+    var editPriority by remember { mutableStateOf(3) }
 
     val priorityColor = mapOf(
         1 to Color(0xFFD32F2F),
@@ -92,7 +96,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Barra de búsqueda
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
@@ -104,7 +107,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Filtros
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("Todas", "Pendientes", "Completadas").forEach { label ->
                     FilterChip(
@@ -121,7 +123,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Lista de tareas
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filteredTasks) { task ->
                     Card(
@@ -136,7 +137,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Checkbox circular con color de prioridad
                             IconButton(onClick = { viewModel.toggleTaskCompletion(task) }) {
                                 Box(
                                     modifier = Modifier
@@ -179,6 +179,18 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                 )
                             }
 
+                            IconButton(onClick = {
+                                taskToEdit = task
+                                editDescription = task.description
+                                editPriority = task.priority
+                            }) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Editar",
+                                    tint = Color.LightGray
+                                )
+                            }
+
                             IconButton(onClick = { viewModel.deleteTask(task) }) {
                                 Icon(
                                     Icons.Default.Delete,
@@ -193,7 +205,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
         }
     }
 
-    // Dialog para agregar tarea
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -239,6 +250,55 @@ fun TaskScreen(viewModel: TaskViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    taskToEdit?.let { task ->
+        AlertDialog(
+            onDismissRequest = { taskToEdit = null },
+            title = { Text("Editar tarea") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editDescription,
+                        onValueChange = { editDescription = it },
+                        label = { Text("Descripción") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Prioridad:", fontWeight = FontWeight.Medium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(1 to "Alta", 2 to "Media", 3 to "Baja").forEach { (value, label) ->
+                            FilterChip(
+                                selected = editPriority == value,
+                                onClick = { editPriority = value },
+                                label = { Text(label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = priorityColor[value]!!,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (editDescription.isNotEmpty()) {
+                            viewModel.editTask(task, editDescription, editPriority)
+                            taskToEdit = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDB4035))
+                ) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskToEdit = null }) {
                     Text("Cancelar")
                 }
             }
