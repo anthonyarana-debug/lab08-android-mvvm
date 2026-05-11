@@ -17,6 +17,9 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    private val _sortAscending = MutableStateFlow(true)
+    val sortAscending: StateFlow<Boolean> = _sortAscending
+
     init {
         viewModelScope.launch {
             _tasks.value = dao.getAllTasks()
@@ -69,13 +72,20 @@ class TaskViewModel(private val dao: TaskDao) : ViewModel() {
         _searchQuery.value = query
     }
 
+    fun toggleSort() {
+        _sortAscending.value = !_sortAscending.value
+    }
+
     fun getFilteredTasks(): List<Task> {
         val filtered = when (_filter.value) {
             "Pendientes" -> _tasks.value.filter { !it.isCompleted }
             "Completadas" -> _tasks.value.filter { it.isCompleted }
             else -> _tasks.value
         }
-        return if (_searchQuery.value.isEmpty()) filtered
+        val searched = if (_searchQuery.value.isEmpty()) filtered
         else filtered.filter { it.description.contains(_searchQuery.value, ignoreCase = true) }
+
+        return if (_sortAscending.value) searched.sortedBy { it.priority }
+        else searched.sortedByDescending { it.priority }
     }
 }

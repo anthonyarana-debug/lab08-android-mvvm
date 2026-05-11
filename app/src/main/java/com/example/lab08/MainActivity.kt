@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
     val tasks by viewModel.tasks.collectAsState()
     val filter by viewModel.filter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val sortAscending by viewModel.sortAscending.collectAsState()
     val filteredTasks = viewModel.getFilteredTasks()
 
     var newTaskDescription by remember { mutableStateOf("") }
@@ -107,7 +110,10 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf("Todas", "Pendientes", "Completadas").forEach { label ->
                     FilterChip(
                         selected = filter == label,
@@ -117,6 +123,16 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             selectedContainerColor = Color(0xFFDB4035),
                             selectedLabelColor = Color.White
                         )
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                IconButton(onClick = { viewModel.toggleSort() }) {
+                    Icon(
+                        imageVector = if (sortAscending) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Ordenar por prioridad",
+                        tint = Color(0xFFDB4035)
                     )
                 }
             }
